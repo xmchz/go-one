@@ -1,4 +1,4 @@
-module go-one
+module github.com/xmchz/go-one
 
 go 1.13
 
