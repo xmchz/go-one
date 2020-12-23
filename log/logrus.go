@@ -26,7 +26,6 @@ func newLogrus(wm map[Level]io.Writer) *logrusLogger {
 		lfshook.WriterMap(lwm),
 		&logrus.TextFormatter{},
 	))
-	lg.SetReportCaller(true)
 	return &logrusLogger{lg}
 }
 
