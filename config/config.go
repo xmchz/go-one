@@ -1,10 +1,10 @@
 package config
 
-import (
-	"fmt"
-	"github.com/spf13/viper"
-	"strings"
-)
+/*
+service --- config | ---- info from file/net/...
+config 侧重于固定结构的信息校验、读取、覆盖
+进一步则需要考虑推送信息变更
+ */
 
 type Config interface {
 	GetInt(string) int
@@ -12,30 +12,10 @@ type Config interface {
 }
 
 func FromFile(confFile string) (Config, error) {
-	vp := viper.New()
-	vp.SetConfigFile(confFile)
-	if err := vp.ReadInConfig(); err != nil {
-		return nil, err
-	}
-	return &viperConfig{vp: vp}, nil
+	return newVp(confFile)
 }
 
 func FromFiles(baseFile string, modeKey string) (Config, error) {
-	base := viper.New()
-	base.SetConfigFile(baseFile) // app.yml
-	if err := base.ReadInConfig(); err != nil {
-		return nil, err
-	}
-	vp := viper.New()
-	for k, v := range base.AllSettings() {
-		vp.SetDefault(k, v)
-	}
-	mode := base.GetString(modeKey)
-	ss := strings.Split(baseFile, ".")
-	suffix := "." + ss[len(ss)-1]
-	vp.SetConfigFile(strings.Replace(baseFile, suffix, fmt.Sprintf("-%s%s", mode, suffix), 1)) // app-mode.yml
-	if err := vp.ReadInConfig(); err != nil {
-		return nil, err
-	}
-	return &viperConfig{vp}, nil
+	return newVpWithMode(baseFile, modeKey)
 }
+

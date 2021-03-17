@@ -1,64 +1,89 @@
 package log
 
 import (
-	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
-	"io"
-	"os"
-	"strings"
+	"fmt"
+	"path"
+	"runtime"
+	"sync"
 	"time"
 )
 
-type Level int8
-
-const (
-	TraceLevel Level = iota - 2
-	DebugLevel
-	InfoLevel
-	WarnLevel
-	ErrorLevel
-	PanicLevel
-	FatalLevel
-)
-
 type Logger interface {
-	Log(level Level, v ...interface{})
-	Logf(level Level, format string, v ...interface{})
+	Log(level Level, format string, args ...interface{})
 	LogFields(fields map[string]interface{})
 }
 
-func New(w io.Writer) Logger {
-	return newLogrus(map[Level]io.Writer{
-		InfoLevel: w,
-		ErrorLevel: w,
-	})
+type Writer interface {
+	Write(*Data)
+	Close()
 }
 
-func NewRotateLog(logName, relativePath string) Logger {
-	w, _ := newRotateWriter(logName, relativePath)
-	return newLogrus(map[Level]io.Writer{
-		InfoLevel: w,
-		ErrorLevel: w,
-	})
+type Formatter interface {
+	Format(*Data) []byte
 }
 
-/*
-logName 日志名
-logPath 相对路径
-*/
-func newRotateWriter(logName, relativePath string) (io.Writer, error) {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
+func New(opts ...Option) *logger {
+	lg := &logger{
+		dataCh:     make(chan *Data, defaultLoggerCh),
+		callerSkip: 1,
+		level: InfoLevel,
 	}
-	logPath := strings.Join([]string{pwd, relativePath}, string(os.PathSeparator))
-	if _, err := os.Stat(logPath); err != nil {
-		if err := os.Mkdir(logPath, os.ModePerm); err != nil {
-			return nil, err
+	for _, opt := range opts {
+		opt(lg)
+	}
+	lg.wg.Add(1)
+	go lg.run()
+	return lg
+}
+
+type logger struct {
+	level      Level
+	writers    []Writer
+	dataCh     chan *Data
+	callerSkip int
+	wg         sync.WaitGroup
+}
+
+func (l *logger) Log(level Level, format string, args ...interface{}) {
+	if level < l.level {
+		return
+	}
+	_, fileName, lineNo, _ := runtime.Caller(l.callerSkip)
+	data := &Data{
+		Level:    level,
+		Time:     time.Now(),
+		Filename: path.Base(fileName),
+		LineNo:   lineNo,
+		Message:  fmt.Sprintf(format, args...),
+	}
+	select {
+	case l.dataCh <- data:
+	default:
+		return
+	}
+}
+
+func (l *logger) LogFields(fields map[string]interface{}) {
+	_, fileName, lineNo, _ := runtime.Caller(l.callerSkip)
+	data := &Data{
+		Level:    InfoLevel,
+		Time:     time.Now(),
+		Filename: path.Base(fileName),
+		LineNo:   lineNo,
+		Fields:   fields,
+	}
+	select {
+	case l.dataCh <- data:
+	default:
+		return
+	}
+}
+
+func (l *logger) run() {
+	for data := range l.dataCh {
+		for _, w := range l.writers {
+			w.Write(data)
 		}
 	}
-	return rotatelogs.New(
-		logPath+string(os.PathSeparator)+logName+".%Y%m%d.log",
-		rotatelogs.WithRotationTime(24*time.Hour),
-		rotatelogs.WithMaxAge(7*24*time.Hour),
-	)
+	l.wg.Done()
 }

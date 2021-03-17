@@ -1,72 +1,51 @@
 package log
 
-import (
-	"io"
-	"os"
+const (
+	defaultLoggerCh = 20000
 )
 
-var defaultLog Logger = newLogrusDefault()
+var (
+	defaultLogger *logger
+)
 
-type Config interface {
-	GetLogPath() string
-	GetLogName() string
-}
 
-func Init(conf Config) error {
-	logPath := conf.GetLogPath()
-	logName := conf.GetLogName()
-	errWriter, err := newRotateWriter(logName+".error", logPath)
-	if err != nil {
-		return err
+func Init(opts ...Option) {
+	defaultLogger = &logger{
+		dataCh: make(chan *Data, defaultLoggerCh),
+		callerSkip: 2,
+		level:InfoLevel,
 	}
-	infoWriter, err := newRotateWriter(logName+".info", logPath)
-	if err != nil {
-		return err
+	for _, opt := range opts {
+		opt(defaultLogger)
 	}
-
-	defaultLog = newLogrus(map[Level]io.Writer{
-		InfoLevel:  infoWriter,
-		ErrorLevel: errWriter,
-	})
-	Infof("%s default log init success", logName)
-	return nil
+	defaultLogger.wg.Add(1)
+	go defaultLogger.run()
 }
 
-func Debug(v ...interface{}) {
-	defaultLog.Log(DebugLevel, v...)
+func Stop() {
+	close(defaultLogger.dataCh)
+	defaultLogger.wg.Wait()
+	for _, writer := range defaultLogger.writers {
+		writer.Close()
+	}
 }
-func Debugf(format string, v ...interface{}) {
-	defaultLog.Logf(DebugLevel, format, v...)
+
+func Debug(format string, args ...interface{}) {
+	defaultLogger.Log(DebugLevel, format, args...)
 }
-func Info(v ...interface{}) {
-	defaultLog.Log(InfoLevel, v...)
+
+func Trace(format string, args ...interface{}) {
+	defaultLogger.Log(TraceLevel, format, args...)
 }
-func Infof(format string, v ...interface{}) {
-	defaultLog.Logf(InfoLevel, format, v...)
+
+func Info(format string, args ...interface{}) {
+	defaultLogger.Log(InfoLevel, format, args...)
 }
-func Warn(v ...interface{}) {
-	defaultLog.Log(WarnLevel, v...)
+
+func Warn(format string, args ...interface{}) {
+	defaultLogger.Log(WarnLevel, format, args...)
 }
-func Warnf(format string, v ...interface{}) {
-	defaultLog.Logf(WarnLevel, format, v...)
-}
-func Error(v ...interface{}) {
-	defaultLog.Log(ErrorLevel, v...)
-}
-func Errorf(format string, v ...interface{}) {
-	defaultLog.Logf(ErrorLevel, format, v...)
-}
-func Panic(v ...interface{}) {
-	defaultLog.Log(PanicLevel, v...)
-}
-func Panicf(format string, v ...interface{}) {
-	defaultLog.Logf(PanicLevel, format, v...)
-}
-func Fatal(v ...interface{}) {
-	defaultLog.Log(FatalLevel, v...)
-	os.Exit(1)
-}
-func Fatalf(format string, v ...interface{}) {
-	defaultLog.Logf(FatalLevel, format, v...)
-	os.Exit(1)
+
+func Error(format string, args ...interface{}) {
+	defaultLogger.Log(ErrorLevel, format, args...)
 }
