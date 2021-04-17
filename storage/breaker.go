@@ -15,9 +15,11 @@ func (s *Breaker) acceptable(err error) bool {
 	return err == nil || err == sql.ErrNoRows || err == sql.ErrTxDone
 }
 
-func (s *Breaker) Create(ctx context.Context, query string, args ...interface{}) (result sql.Result, err error) {
-	return nil, s.Do(func() error {
-		return s.Storage.Create(ctx, query, args...)
+func (s *Breaker) Create(ctx context.Context, query string, args ...interface{}) (res sql.Result, err error) {
+
+	return res, s.Do(func() error {
+		res, err  = s.Storage.Create(ctx, query, args...)
+		return err
 	}, s.acceptable)
 }
 
