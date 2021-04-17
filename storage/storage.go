@@ -14,10 +14,8 @@ const (
 func New(conf Config, opts ...Option) Storage {
 	pool, err := sqlx.Connect(conf.DbDriver(), conf.DbUrl())
 	if err != nil {
-		log.Error("connect DB failed, err:%v", err)
-		panic(err)
+		log.Fatal("connect DB failed, err:%v", err)
 	}
-	log.Info("connect DB success: %s", conf.DbInfo())
 	pool.SetMaxOpenConns(conf.MaxOpenConn())
 	pool.SetMaxIdleConns(conf.MaxIdleConn())
 	var s Storage
