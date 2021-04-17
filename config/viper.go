@@ -7,6 +7,13 @@ import (
 	"strings"
 )
 
+/*
+app.yml
+app-dev.yml
+app-prod.yml
+*/
+const fmtModeFile = "-%s%s"
+
 func newVp(confFile string) (*vp, error) {
 	v := viper.New()
 	v.SetConfigFile(confFile)
@@ -37,7 +44,7 @@ func newVpWithMode(baseFile, modeKey string) (*vp, error) {
 	mode := b.GetString(modeKey)
 	ss := strings.Split(baseFile, ".")
 	suffix := "." + ss[len(ss)-1]
-	c.SetConfigFile(strings.Replace(baseFile, suffix, fmt.Sprintf("-%s%s", mode, suffix), 1)) // app-mode.yml
+	c.SetConfigFile(strings.Replace(baseFile, suffix, fmt.Sprintf(fmtModeFile, mode, suffix), 1)) // app-{mode}.yml
 	if err := c.ReadInConfig(); err != nil {
 		return nil, err
 	}

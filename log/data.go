@@ -9,10 +9,10 @@ import (
 type Data struct {
 	Level    Level     `json:"level"`
 	Time     time.Time `json:"time"`
-	Message  string    `json:"message"`
 	Filename string    `json:"filename"`
 	LineNo   int       `json:"line_no"`
-	Fields   Fields
+	Message  string    `json:"message,omitempty"`
+	Fields   Fields    `json:"fields,omitempty"`
 }
 
 type Fields map[string]interface{}

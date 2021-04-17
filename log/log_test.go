@@ -46,7 +46,7 @@ func TestNewLogger(t *testing.T) {
 		t.Fatal(err)
 	}
 	lg := log.New(
-		log.WithWriters(w, &writer.Console{Formatter: &formatter.Text{}}),
+		log.WithWriters(w, &writer.Console{Formatter: &formatter.Json{}}),
 	)
 	lg.Log(log.InfoLevel, "this is log info")
 	lg.LogFields(map[string]interface{}{"name": "chouchou", "age": 1})

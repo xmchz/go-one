@@ -7,7 +7,6 @@ import (
 	"github.com/xmchz/go-one/log"
 	"github.com/xmchz/go-one/log/formatter"
 	"github.com/xmchz/go-one/log/writer"
-	metricMem "github.com/xmchz/go-one/metric/mem"
 	"os"
 	"sync"
 	"testing"
@@ -49,7 +48,7 @@ func TestWithBlock(t *testing.T) {
 }
 
 func TestWithMetric(t *testing.T) {
-	counter := metricMem.NewCounter()
+	counter := &cache.Stats{}
 	c := cache.New(
 		mem.New(),
 		cache.WithMetric(
@@ -63,5 +62,9 @@ func TestWithMetric(t *testing.T) {
 	assert.Nil(t, err)
 	err = c.Get("k", &v)
 	assert.Nil(t, err)
-	assert.Equal(t, 3, int(counter.Value()))
+
+	hit, miss := counter.Value()
+	log.Info("hit: %d, miss: %d", hit, miss)
+	assert.Equal(t, 2, int(hit))
+	assert.Equal(t, 1, int(miss))
 }
