@@ -10,10 +10,10 @@ import (
 )
 
 
-func NewBigCache(maxSize int) *bc {
-	c, err := bigcache.NewBigCache(bigcache.Config{
-		HardMaxCacheSize: maxSize,
-	})
+func NewBigCache(maxSize int, eviction time.Duration) *bc {
+	config := bigcache.DefaultConfig(eviction)
+	config.HardMaxCacheSize = maxSize
+	c, err := bigcache.NewBigCache(config)
 	if err != nil {
 		log.Fatal("cache init failed: %s", err.Error())
 	}
