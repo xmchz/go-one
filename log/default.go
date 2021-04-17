@@ -10,12 +10,11 @@ var (
 	defaultLogger *logger
 )
 
-
 func Init(opts ...Option) {
 	defaultLogger = &logger{
-		dataCh: make(chan *Data, defaultLoggerCh),
+		dataCh:     make(chan *Data, defaultLoggerCh),
 		callerSkip: 2,
-		level:InfoLevel,
+		level:      InfoLevel,
 	}
 	for _, opt := range opts {
 		opt(defaultLogger)
