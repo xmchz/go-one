@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"github.com/jmoiron/sqlx"
 	"github.com/xmchz/go-one/log"
 )
@@ -29,7 +30,7 @@ func New(conf Config, opts ...Option) Storage {
 
 type Storage interface {
 	BeginWithTx(ctx context.Context) (context.Context, func(err error), error)
-	Create(ctx context.Context, query string, args ...interface{}) error
+	Create(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	Find(ctx context.Context, dest interface{}, query string, args ...interface{}) error
 	FindList(ctx context.Context, dests interface{}, query string, args ...interface{}) error
 	FindListIn(ctx context.Context, dests interface{}, query string, set interface{}) error
@@ -58,16 +59,18 @@ func (s *storage) BeginWithTx(ctx context.Context) (context.Context, func(err er
 	}, err
 }
 
-func (s *storage) Create(ctx context.Context, query string, args ...interface{}) error {
+func (s *storage) Create(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
 	return s.exec(ctx, query, args...)
 }
 
-func (s *storage) Update(ctx context.Context, query string, args ...interface{})  error {
-	return s.exec(ctx, query, args...)
+func (s *storage) Update(ctx context.Context, query string, args ...interface{}) error {
+	_, err := s.exec(ctx, query, args...)
+	return err
 }
 
 func (s *storage) Delete(ctx context.Context, query string, args ...interface{}) error {
-	return s.exec(ctx, query, args...)
+	_, err := s.exec(ctx, query, args...)
+	return err
 }
 
 func (s *storage) Find(ctx context.Context, dest interface{}, query string, args ...interface{}) (err error) {
@@ -80,7 +83,7 @@ func (s *storage) Find(ctx context.Context, dest interface{}, query string, args
 	return
 }
 
-func (s *storage)FindList(ctx context.Context, dests interface{}, query string, args ...interface{}) (err error) {
+func (s *storage) FindList(ctx context.Context, dests interface{}, query string, args ...interface{}) (err error) {
 	if tx := s.tx(ctx); tx != nil {
 		err = tx.SelectContext(ctx, dests, query, args...)
 		return
@@ -103,15 +106,12 @@ func (s *storage) FindListIn(ctx context.Context, dests interface{}, query strin
 	return
 }
 
-func (s *storage) exec(ctx context.Context, query string, args ...interface{}) (err error) {
+func (s *storage) exec(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
 	if tx := s.tx(ctx); tx != nil {
-		_, err = tx.ExecContext(ctx, query, args...)
-		return
+		return tx.ExecContext(ctx, query, args...)
 	}
-	_, err = s.DB.ExecContext(ctx, query, args...)
-	return
+	return s.DB.ExecContext(ctx, query, args...)
 }
-
 
 func (s *storage) tx(ctx context.Context) *sqlx.Tx {
 	tx, ok := ctx.Value(ctxTxKey).(*sqlx.Tx)

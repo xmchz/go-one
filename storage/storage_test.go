@@ -66,7 +66,7 @@ func TestMain(m *testing.M) {
 
 func TestStorage_Create(t *testing.T) {
 	s := storage.New(&dbConf{})
-	err := s.Create(context.Background(), sqlInsert, "test content test content test content")
+	_, err := s.Create(context.Background(), sqlInsert, "test content test content test content")
 	assert.Nil(t, err)
 }
 
@@ -77,10 +77,10 @@ func TestStorage_Tx(t *testing.T) {
 		return
 	}
 	defer func() { cleanTx(err) }()
-	if err = s.Create(ctx, sqlInsert, "test content test content test content"); err != nil {
+	if _, err = s.Create(ctx, sqlInsert, "test content test content test content"); err != nil {
 		return
 	}
-	if err = s.Create(ctx, sqlInsertErr); err != nil {
+	if _, err = s.Create(ctx, sqlInsertErr); err != nil {
 		return
 	}
 }
@@ -92,10 +92,10 @@ func TestStorage_Tx2(t *testing.T) {
 		return
 	}
 	defer func() { cleanTx(err) }()
-	if err = s.Create(ctx, sqlInsert, "test content test content test content"); err != nil {
+	if _, err = s.Create(ctx, sqlInsert, "test content test content test content"); err != nil {
 		return
 	}
-	if err = s.Create(ctx, sqlInsert, "test content test content test content"); err != nil {
+	if _, err = s.Create(ctx, sqlInsert, "test content test content test content"); err != nil {
 		return
 	}
 }
