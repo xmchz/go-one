@@ -1,5 +1,7 @@
 package log
 
+import "os"
+
 const (
 	defaultLoggerCh = 20000
 )
@@ -48,4 +50,9 @@ func Warn(format string, args ...interface{}) {
 
 func Error(format string, args ...interface{}) {
 	defaultLogger.Log(ErrorLevel, format, args...)
+}
+
+func Fatal(format string, args ...interface{}) {
+	defaultLogger.Log(ErrorLevel, format, args...)
+	os.Exit(1)
 }
