@@ -9,18 +9,18 @@ import (
 	"time"
 )
 
-func New() *Cache {
-	return &Cache{
+func New() *lru {
+	return &lru{
 		Lru: container.NewLru(3),
 	}
 }
 
-type Cache struct {
+type lru struct {
 	*container.Lru
 	mu sync.Mutex
 }
 
-func (c *Cache) Get(key string, dest interface{}) error {
+func (c *lru) Get(key string, dest interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var ok bool
@@ -32,14 +32,14 @@ func (c *Cache) Get(key string, dest interface{}) error {
 	return nil
 }
 
-func (c *Cache) Set(key string, val interface{}) error {
+func (c *lru) Set(key string, val interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.Lru.Set(key, val)
 	return nil
 }
 
-func (c *Cache) Del(keys ...string) error {
+func (c *lru) Del(keys ...string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, key := range keys {
@@ -49,7 +49,7 @@ func (c *Cache) Del(keys ...string) error {
 	return nil
 }
 
-func (c *Cache) Take(dest interface{}, key string, query func(v interface{}) error) error {
+func (c *lru) Take(dest interface{}, key string, query func(v interface{}) error) error {
 	err := c.Get(key, dest)
 	if errors.Is(cache.ErrNotFound, err) {
 		if err := query(dest); err != nil {
@@ -60,10 +60,10 @@ func (c *Cache) Take(dest interface{}, key string, query func(v interface{}) err
 	return nil
 }
 
-func (c *Cache) SetWithExpire(key string, v interface{}, expire time.Duration) error {
+func (c *lru) SetWithExpire(key string, v interface{}, expire time.Duration) error {
 	return c.Set(key, v)
 }
 
-func (c *Cache) TakeWithExpire(dest interface{}, key string, query func(v interface{}) error, expire time.Duration) error {
+func (c *lru) TakeWithExpire(dest interface{}, key string, query func(v interface{}) error, expire time.Duration) error {
 	return c.Take(dest, key, query)
 }
