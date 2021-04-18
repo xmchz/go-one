@@ -16,7 +16,7 @@ func NewBigCache(maxSize int, eviction time.Duration) *bc {
 	config.HardMaxCacheSize = maxSize
 	c, err := bigcache.NewBigCache(config)
 	if err != nil {
-		log.Fatal("cache init failed: %s", err.Error())
+		log.Fatal("mem bigcache init failed: %s", err.Error())
 	}
 	log.Info("[mem bigcache] init success")
 	return &bc{
@@ -28,20 +28,24 @@ type bc struct {
 	cache *bigcache.BigCache
 }
 
-func (c *bc) Get(key string, dest interface{}) error {
-	dest, err := c.cache.Get(key)
+func (c *bc) Get(k string, dest interface{}) error {
+	bs, err := c.cache.Get(k)
 	if err != nil && errors.Is(err, bigcache.ErrEntryNotFound) {
-		log.Debug("mem bigcache miss, key: %s", key)
+		log.Debug("mem bigcache miss, key: %s", k)
 		return cache.ErrNotFound
 	}
-	log.Debug("mem bigcache hit, key: %s", key)
+	err = json.Unmarshal(bs, &dest)
+	if err != nil {
+		return fmt.Errorf("mem bigcache marshal key:%s, err:%w", k, err)
+	}
+	log.Debug("mem bigcache hit, key: %s", k)
 	return nil
 }
 
 func (c *bc) Set(k string, v interface{}) error {
 	bs, err := json.Marshal(v)
 	if err != nil {
-		return fmt.Errorf("cache marshal key:%s, err:%w", k, err)
+		return fmt.Errorf("mem bigcache marshal key:%s, err:%w", k, err)
 	}
 	return c.cache.Set(k, bs)
 }
@@ -49,7 +53,7 @@ func (c *bc) Set(k string, v interface{}) error {
 func (c *bc) Del(keys ...string) error {
 	for _, k:= range keys {
 		if err := c.cache.Delete(k); err != nil {
-			return fmt.Errorf("delete key: %s, err: %w", k, err)
+			return fmt.Errorf("mem bigcache delete key: %s, err: %w", k, err)
 		}
 	}
 	return nil
@@ -63,7 +67,7 @@ func (c *bc) Take(dest interface{}, k string, query func(v interface{}) error) e
 		}
 		err = c.Set(k, dest)
 		if err != nil {
-			log.Error("cache take key:%s, err:%s", k, err.Error())
+			log.Error("mem bigcache take key:%s, err:%s", k, err.Error())
 		}
 	}
 	return nil
