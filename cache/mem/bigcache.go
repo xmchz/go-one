@@ -36,7 +36,7 @@ func (c *bc) Get(k string, dest interface{}) error {
 	}
 	err = json.Unmarshal(bs, &dest)
 	if err != nil {
-		return fmt.Errorf("mem bigcache marshal key:%s, err:%w", k, err)
+		return fmt.Errorf("mem bigcache unmarshal key:%s, err:%w", k, err)
 	}
 	log.Debug("mem bigcache hit, key: %s", k)
 	return nil

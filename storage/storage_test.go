@@ -127,7 +127,7 @@ func TestWithCache(t *testing.T) {
 	var res string
 	for _, id := range []int{12, 13, 14, 12, 15, 13} {
 		err := s.Find(
-			context.WithValue(context.Background(), storage.CtxCacheKey, fmt.Sprintf("content-id-%d", id)),
+			storage.CtxSetKey(context.Background(), fmt.Sprintf("content-id-%d", id)),
 			&res,
 			sqlFind,
 			id,
@@ -150,7 +150,7 @@ func TestWithCache2(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		go func() {
 			var res string
-			_ = s.Find(context.WithValue(context.Background(), storage.CtxCacheKey, fmt.Sprintf("content-id-%d", id)),
+			_ = s.Find(storage.CtxSetKey(context.Background(), fmt.Sprintf("content-id-%d", id)),
 				&res,
 				sqlFind,
 				id,
@@ -160,7 +160,7 @@ func TestWithCache2(t *testing.T) {
 	}
 	wg.Wait()
 	var res string
-	_ = s.Find(context.WithValue(context.Background(), storage.CtxCacheKey, fmt.Sprintf("content-id-%d", id)),
+	_ = s.Find(storage.CtxSetKey(context.Background(), fmt.Sprintf("content-id-%d", id)),
 		&res,
 		sqlFind,
 		id,
@@ -183,7 +183,7 @@ func TestStorage_Update(t *testing.T) {
 	)
 	var res string
 	id := 12
-	ctx := context.WithValue(context.Background(), storage.CtxCacheKey, fmt.Sprintf("content-id-%d", id))
+	ctx := context.WithValue(context.Background(), storage.CtxKeyCacheEnable, fmt.Sprintf("content-id-%d", id))
 	for i := 0; i < 2; i++ {
 		err := s.Find(ctx, &res, sqlFind, id)
 		require.Nil(t, err)
