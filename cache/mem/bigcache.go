@@ -1,6 +1,7 @@
 package mem
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/allegro/bigcache/v3"
@@ -30,15 +31,17 @@ type bc struct {
 func (c *bc) Get(key string, dest interface{}) error {
 	dest, err := c.cache.Get(key)
 	if err != nil && errors.Is(err, bigcache.ErrEntryNotFound) {
+		log.Debug("mem bigcache miss, key: %s", key)
 		return cache.ErrNotFound
 	}
+	log.Debug("mem bigcache hit, key: %s", key)
 	return nil
 }
 
 func (c *bc) Set(k string, v interface{}) error {
-	bs, ok := v.([]byte)
-	if !ok {
-		return errors.New("need bytes")
+	bs, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Errorf("cache marshal key:%s, err:%w", k, err)
 	}
 	return c.cache.Set(k, bs)
 }
@@ -46,19 +49,22 @@ func (c *bc) Set(k string, v interface{}) error {
 func (c *bc) Del(keys ...string) error {
 	for _, k:= range keys {
 		if err := c.cache.Delete(k); err != nil {
-			return fmt.Errorf("delete key: %s, failed: %s", k, err.Error())
+			return fmt.Errorf("delete key: %s, err: %w", k, err)
 		}
 	}
 	return nil
 }
 
-func (c *bc) Take(dest interface{}, key string, query func(v interface{}) error) error {
-	err := c.Get(key, dest)
+func (c *bc) Take(dest interface{}, k string, query func(v interface{}) error) error {
+	err := c.Get(k, dest)
 	if errors.Is(cache.ErrNotFound, err) {
 		if err := query(dest); err != nil {
 			return err
 		}
-		_ = c.Set(key, dest)
+		err = c.Set(k, dest)
+		if err != nil {
+			log.Error("cache take key:%s, err:%s", k, err.Error())
+		}
 	}
 	return nil
 }

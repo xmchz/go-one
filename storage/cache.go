@@ -27,17 +27,18 @@ func (s *Cache) key(ctx context.Context) (string, error) {
 
 func (s *Cache) Find(ctx context.Context, dest interface{}, query string, args ...interface{}) error {
 	key, err := s.key(ctx)
-	if err != nil {
+	if errors.Is(err, ErrCacheKeyNotExist) {
 		return s.Storage.Find(ctx, dest, query, args...)
 	}
 	return s.Cache.Take(dest, key, func(v interface{}) error {
+		log.Debug("query from db, key:%s", key)
 		return s.Storage.Find(ctx, dest, query, args...)
 	})
 }
 
 func (s *Cache) Update(ctx context.Context, query string, args ...interface{}) error {
 	key, err := s.key(ctx)
-	if err != nil {
+	if errors.Is(err, ErrCacheKeyNotExist) {
 		return s.Storage.Update(ctx, query, args...)
 	}
 	if err := s.Storage.Update(ctx, query, args...); err != nil {
@@ -48,7 +49,7 @@ func (s *Cache) Update(ctx context.Context, query string, args ...interface{}) e
 
 func (s *Cache) Delete(ctx context.Context, query string, args ...interface{}) error {
 	key, err := s.key(ctx)
-	if err != nil {
+	if errors.Is(err, ErrCacheKeyNotExist) {
 		return s.Storage.Delete(ctx, query, args...)
 	}
 	if err := s.Storage.Delete(ctx, query, args...); err != nil {

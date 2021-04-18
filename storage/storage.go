@@ -72,7 +72,6 @@ func (s *storage) Delete(ctx context.Context, query string, args ...interface{})
 }
 
 func (s *storage) Find(ctx context.Context, dest interface{}, query string, args ...interface{}) (err error) {
-	log.Debug("query from db")
 	if tx := s.tx(ctx); tx != nil {
 		err = tx.GetContext(ctx, dest, query, args...)
 		return
