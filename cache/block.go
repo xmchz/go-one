@@ -1,7 +1,10 @@
 package cache
 
 import (
+	"encoding/json"
 	"errors"
+
+	"github.com/xmchz/go-one/log"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -12,15 +15,26 @@ type Block struct {
 
 func (c *Block) Take(dest interface{}, key string, query func(v interface{}) error) error {
 	err := c.Get(key, dest)
-	if errors.Is(ErrNotFound, err) {
-		dest, err, _ = c.Do(key, func() (interface{}, error) {
-			var v interface{}
-			err = query(v)
-			if err == nil {
-				_ = c.Set(key, v)
+	if errors.Is(err, ErrNotFound) {
+
+		sharedMarshaledVal, err, shared := c.Do(key, func() (interface{}, error) {
+			// single flight
+			err = query(dest)
+			log.Debug("%s do: %v", key, dest)
+			if err != nil {
+				return nil, err
 			}
-			return v, err
+			_ = c.Set(key, dest)
+			return json.Marshal(dest)  // marshal to share value
 		})
+		if err != nil {
+			return err
+		}
+		// concurrency shared
+		json.Unmarshal(sharedMarshaledVal.([]byte), dest)
+		if shared {
+			log.Debug("%s shared: %v", key, sharedMarshaledVal)
+		}
 	}
 	return err
 }

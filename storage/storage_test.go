@@ -11,6 +11,7 @@ import (
 	"github.com/xmchz/go-one/cache"
 	"github.com/xmchz/go-one/cache/mem"
 	"github.com/xmchz/go-one/log"
+	logCore "github.com/xmchz/go-one/log/core"
 	"github.com/xmchz/go-one/log/formatter"
 	"github.com/xmchz/go-one/log/writer"
 	"github.com/xmchz/go-one/storage"
@@ -29,6 +30,13 @@ const (
 )
 
 type dbConf struct{}
+
+func (d dbConf) MigrationUrl() string {
+	return ""
+}
+func (d dbConf) MigrationVersion() uint {
+	return 0
+}
 
 func (d dbConf) DbDriver() string {
 	return "mysql"
@@ -56,8 +64,8 @@ func (d dbConf) MaxOpenConn() int {
 
 func TestMain(m *testing.M) {
 	log.Init(
-		log.WithWriters(&writer.Console{Formatter: &formatter.Text{}}),
-		log.WithLevel(log.DebugLevel),
+		logCore.WithWriters(writer.NewConsole(&formatter.Text{})),
+		logCore.WithLevel(logCore.DebugLevel),
 	)
 	exitVal := m.Run()
 	log.Stop()
@@ -66,18 +74,19 @@ func TestMain(m *testing.M) {
 
 func TestStorage_Create(t *testing.T) {
 	s := storage.New(&dbConf{})
-	_, err := s.Create(context.Background(), sqlInsert, "test content test content test content")
+	_, err := s.Create(context.Background(), sqlInsert, "test content23")
 	assert.Nil(t, err)
 }
 
 func TestStorage_Tx(t *testing.T) {
 	s := storage.New(&dbConf{})
 	ctx, cleanTx, err := s.BeginWithTx(context.Background())
-	if err != nil {
-		return
-	}
-	defer func() { cleanTx(err) }()
-	if _, err = s.Create(ctx, sqlInsert, "test content test content test content"); err != nil {
+	require.Nil(t, err)
+	defer func() {
+		cleanErr := cleanTx(recover(), err)
+		require.Nil(t, cleanErr)
+	}()
+	if _, err = s.Create(ctx, sqlInsert, ""); err != nil {
 		return
 	}
 	if _, err = s.Create(ctx, sqlInsertErr); err != nil {
@@ -88,16 +97,18 @@ func TestStorage_Tx(t *testing.T) {
 func TestStorage_Tx2(t *testing.T) {
 	s := storage.New(&dbConf{})
 	ctx, cleanTx, err := s.BeginWithTx(context.Background())
-	if err != nil {
+	require.Nil(t, err)
+	defer func() {
+		cleanErr := cleanTx(recover(), err)
+		require.Nil(t, cleanErr)
+	}()
+	if _, err = s.Create(ctx, sqlInsert, ""); err != nil {
 		return
 	}
-	defer func() { cleanTx(err) }()
-	if _, err = s.Create(ctx, sqlInsert, "test content test content test content"); err != nil {
+	if _, err = s.Create(ctx, sqlInsert, ""); err != nil {
 		return
 	}
-	if _, err = s.Create(ctx, sqlInsert, "test content test content test content"); err != nil {
-		return
-	}
+	panic("panic in tx")
 }
 
 func TestNew(t *testing.T) {
@@ -127,7 +138,7 @@ func TestWithCache(t *testing.T) {
 	var res string
 	for _, id := range []int{12, 13, 14, 12, 15, 13} {
 		err := s.Find(
-			storage.CtxSetKey(context.Background(), fmt.Sprintf("content-id-%d", id)),
+			storage.CtxWithCacheKey(context.Background(), fmt.Sprintf("content-id-%d", id)),
 			&res,
 			sqlFind,
 			id,
@@ -136,35 +147,38 @@ func TestWithCache(t *testing.T) {
 	}
 }
 
-func TestWithCache2(t *testing.T) {
+func TestWithCacheConcurrency(t *testing.T) {
+	c := cache.New(
+		mem.New(),
+		cache.WithBlock(),
+	)
 	s := storage.New(
 		&dbConf{},
-		//storage.WithCache(mem.New()),
-		storage.WithCache(&cache.Block{
-			Cache: mem.New(),
-		}),
+		storage.WithCache(c),
 	)
-	id := 12
-	var wg sync.WaitGroup
-	wg.Add(100)
-	for i := 0; i < 100; i++ {
-		go func() {
-			var res string
-			_ = s.Find(storage.CtxSetKey(context.Background(), fmt.Sprintf("content-id-%d", id)),
-				&res,
-				sqlFind,
-				id,
-			)
-			wg.Done()
-		}()
+
+	var (
+		wg          sync.WaitGroup
+		concurrency = 10
+		id          = 238
+		cacheKeyFmt = "content-id-%d"
+		ctx         = storage.CtxWithCacheKey(context.Background(), fmt.Sprintf(cacheKeyFmt, id))
+	)
+	wg.Add(concurrency)
+	for i := 0; i < concurrency; i++ {
+		go func(i int) {
+			defer wg.Done()
+			var content string
+			_ = s.Find(ctx, &content, sqlFind, id)
+			// require.Nil(t, err)
+			log.Info("[%d] find content: %s, %p", i, content, &content)
+		}(i)
 	}
 	wg.Wait()
-	var res string
-	_ = s.Find(storage.CtxSetKey(context.Background(), fmt.Sprintf("content-id-%d", id)),
-		&res,
-		sqlFind,
-		id,
-	)
+	var content string
+	_ = s.Find(ctx, &content, sqlFind, id)
+	// require.Nil(t, err)
+	log.Info("[main] find content: %s, %p", content, &content)
 }
 
 func TestStorage_Find(t *testing.T) {
@@ -174,24 +188,40 @@ func TestStorage_Find(t *testing.T) {
 	var res string
 	err := s.Find(context.Background(), &res, sqlFind, -1)
 	assert.Equal(t, err, sql.ErrNoRows)
+	err = s.Find(context.Background(), &res, sqlFind, 238)
+	assert.Nil(t, err)
 }
 
-func TestStorage_Update(t *testing.T) {
+func TestStorage_Create_Find_Update_Delete(t *testing.T) {
 	s := storage.New(
 		&dbConf{},
 		storage.WithCache(mem.New()),
 	)
-	var res string
-	id := 12
-	ctx := context.WithValue(context.Background(), storage.CtxKeyCacheEnable, fmt.Sprintf("content-id-%d", id))
+	var (
+		err         error
+		initContent = "chouchou"
+		content     string
+		id          int64
+		ctx         = context.Background()
+		cacheFmt    = "content-id-%d"
+	)
+	res, err := s.Create(ctx, sqlInsert, initContent)
+	require.Nil(t, err)
+	log.Info("create content: %s", initContent)
+
+	id, _ = res.LastInsertId()
+	ctx = storage.CtxWithCacheKey(ctx, fmt.Sprintf(cacheFmt, id))
 	for i := 0; i < 2; i++ {
-		err := s.Find(ctx, &res, sqlFind, id)
+		err := s.Find(ctx, &content, sqlFind, id)
 		require.Nil(t, err)
+		log.Info("find content: %s", content)
 	}
-	err := s.Update(ctx, sqlUpdate, "1"+res, id)
+	err = s.Update(ctx, sqlUpdate, "1 "+content, id)
 	require.Nil(t, err)
-	err = s.Find(ctx, &res, sqlFind, id)
+	log.Info("content updated")
+	err = s.Find(ctx, &content, sqlFind, id)
 	require.Nil(t, err)
+	log.Info("find content: %s", content)
 }
 
 func TestStorage_FindList(t *testing.T) {

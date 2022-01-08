@@ -1,89 +1,54 @@
 package log
 
 import (
-	"fmt"
-	"path"
-	"runtime"
+	"os"
 	"sync"
-	"time"
+
+	"github.com/xmchz/go-one/log/core"
+	"github.com/xmchz/go-one/log/formatter"
+	"github.com/xmchz/go-one/log/writer"
 )
 
-type Logger interface {
-	Log(level Level, format string, args ...interface{})
-	LogFields(fields map[string]interface{})
+var (
+	once          sync.Once
+	defaultLogger = core.New(
+		core.WithWriters(writer.NewConsole(&formatter.Text{})),
+		core.WithCallerSkip(2),
+	)
+)
+
+func Init(opts ...core.Option) {
+	once.Do(func() {
+		defaultLogger = core.New(append(opts, core.WithCallerSkip(2))...)
+	})
 }
 
-type Writer interface {
-	Write(*Data)
-	Close()
+func Stop() {
+	defaultLogger.Stop()
 }
 
-type Formatter interface {
-	Format(*Data) []byte
+func Debug(format string, args ...interface{}) {
+	defaultLogger.LogMsg(core.DebugLevel, format, args...)
 }
 
-func New(opts ...Option) *logger {
-	lg := &logger{
-		dataCh:     make(chan *Data, defaultLoggerCh),
-		callerSkip: 1,
-		level: InfoLevel,
-	}
-	for _, opt := range opts {
-		opt(lg)
-	}
-	lg.wg.Add(1)
-	go lg.run()
-	return lg
+func Trace(format string, args ...interface{}) {
+	defaultLogger.LogMsg(core.TraceLevel, format, args...)
 }
 
-type logger struct {
-	level      Level
-	writers    []Writer
-	dataCh     chan *Data
-	callerSkip int
-	wg         sync.WaitGroup
+func Info(format string, args ...interface{}) {
+	defaultLogger.LogMsg(core.InfoLevel, format, args...)
 }
 
-func (l *logger) Log(level Level, format string, args ...interface{}) {
-	if level < l.level {
-		return
-	}
-	_, fileName, lineNo, _ := runtime.Caller(l.callerSkip)
-	data := &Data{
-		Level:    level,
-		Time:     time.Now(),
-		Filename: path.Base(fileName),
-		LineNo:   lineNo,
-		Message:  fmt.Sprintf(format, args...),
-	}
-	select {
-	case l.dataCh <- data:
-	default:
-		return
-	}
+func Warn(format string, args ...interface{}) {
+	defaultLogger.LogMsg(core.WarnLevel, format, args...)
 }
 
-func (l *logger) LogFields(fields map[string]interface{}) {
-	_, fileName, lineNo, _ := runtime.Caller(l.callerSkip)
-	data := &Data{
-		Level:    InfoLevel,
-		Time:     time.Now(),
-		Filename: path.Base(fileName),
-		LineNo:   lineNo,
-		Fields:   fields,
-	}
-	select {
-	case l.dataCh <- data:
-	default:
-		return
-	}
+func Error(format string, args ...interface{}) {
+	defaultLogger.LogMsg(core.ErrorLevel, format, args...)
 }
 
-func (l *logger) run() {
-	for data := range l.dataCh {
-		for _, w := range l.writers {
-			w.Write(data)
-		}
-	}
-	l.wg.Done()
+func Fatal(format string, args ...interface{}) {
+	defaultLogger.LogMsg(core.ErrorLevel, format, args...)
+	defaultLogger.Stop()
+	os.Exit(1)
 }

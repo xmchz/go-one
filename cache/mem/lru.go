@@ -1,12 +1,15 @@
 package mem
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"sync"
+	"time"
+
 	"github.com/xmchz/go-one/cache"
 	"github.com/xmchz/go-one/container"
 	"github.com/xmchz/go-one/log"
-	"sync"
-	"time"
 )
 
 func New() *lru {
@@ -23,10 +26,20 @@ type lru struct {
 func (c *lru) Get(key string, dest interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	var ok bool
-	if dest, ok = c.Lru.Get(key); !ok {
+	val, ok := c.Lru.Get(key)
+	if !ok {
 		log.Debug("mem cache miss, key: %s", key)
 		return cache.ErrNotFound
+	}
+	bs, ok := val.([]byte)
+	if !ok {
+		c.Lru.Del(key)
+		log.Debug("mem cache miss, val not bytes, key: %s", key)
+		return cache.ErrNotFound
+	}
+	err := json.Unmarshal(bs, dest)
+	if err != nil {
+		return fmt.Errorf("mem lru cache unmarshal key:%s, err:%w", key, err)
 	}
 	log.Debug("mem cache hit, key: %s", key)
 	return nil
@@ -35,7 +48,11 @@ func (c *lru) Get(key string, dest interface{}) error {
 func (c *lru) Set(key string, val interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.Lru.Set(key, val)
+	bs, err := json.Marshal(val)
+	if err != nil {
+		return fmt.Errorf("mem lru cache marshal key:%s, err:%w", key, err)
+	}
+	c.Lru.Set(key, bs) 
 	return nil
 }
 
@@ -55,7 +72,7 @@ func (c *lru) Take(dest interface{}, key string, query func(v interface{}) error
 		if err := query(dest); err != nil {
 			return err
 		}
-		_ = c.Set(key, dest)
+		_ = c.Set(key, dest) // FIXME: addr cached
 	}
 	return nil
 }

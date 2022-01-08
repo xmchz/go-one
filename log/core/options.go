@@ -1,4 +1,4 @@
-package log
+package core
 
 type Option func(*logger)
 
@@ -13,3 +13,10 @@ func WithLevel(level Level) Option {
 		l.level = level
 	}
 }
+
+func WithCallerSkip(skip int) Option {
+	return func(l *logger) {
+		l.callerSkip = skip
+	}
+}
+

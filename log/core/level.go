@@ -1,4 +1,4 @@
-package log
+package core
 
 type Level int8
 

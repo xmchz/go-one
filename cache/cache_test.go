@@ -5,8 +5,6 @@ import (
 	"github.com/xmchz/go-one/cache"
 	"github.com/xmchz/go-one/cache/mem"
 	"github.com/xmchz/go-one/log"
-	"github.com/xmchz/go-one/log/formatter"
-	"github.com/xmchz/go-one/log/writer"
 	"os"
 	"sync"
 	"testing"
@@ -19,10 +17,6 @@ var source = func(v interface{}) error {
 }
 
 func TestMain(m *testing.M) {
-	log.Init(
-		log.WithWriters(&writer.Console{Formatter: &formatter.Text{}}),
-		log.WithLevel(log.DebugLevel),
-	)
 	exitVal := m.Run()
 	log.Stop()
 	os.Exit(exitVal)

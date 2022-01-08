@@ -2,13 +2,13 @@ package formatter
 
 import (
 	"encoding/json"
-	"github.com/xmchz/go-one/log"
+	"github.com/xmchz/go-one/log/core"
 )
 
 type Json struct {
 }
 
-func (w *Json) Format(data *log.Data) []byte {
+func (w *Json) Format(data *core.Data) []byte {
 	bs, _ := json.Marshal(data)
-	return append(bs, []byte(sepLine)...)
+	return bs
 }

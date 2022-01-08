@@ -2,7 +2,7 @@ package writer
 
 import (
 	"fmt"
-	"github.com/xmchz/go-one/log"
+	"github.com/xmchz/go-one/log/core"
 )
 
 type color uint8
@@ -22,10 +22,10 @@ func (c color) Add(s string) string {
 	return fmt.Sprintf("\x1b[%dm%s\x1b[0m", uint8(c), s)
 }
 
-var cm = map[log.Level]color{
-	log.InfoLevel:   green,
-	log.DebugLevel:  cyan,
-	log.TraceLevel:  white,
-	log.WarnLevel:   yellow,
-	log.ErrorLevel:  red,
+var cm = map[core.Level]color{
+	core.InfoLevel:   green,
+	core.DebugLevel:  cyan,
+	core.TraceLevel:  white,
+	core.WarnLevel:   yellow,
+	core.ErrorLevel:  red,
 }

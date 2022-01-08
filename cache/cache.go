@@ -18,7 +18,7 @@ func New(cache Cache, opts ...Option) Cache {
 
 type Cache interface {
 	Get(key string, dest interface{}) error
-	Set(key string, v interface{}) error
+	Set(key string, value interface{}) error
 	Del(keys ...string) error
 	Take(dest interface{}, key string, query func(v interface{}) error) error
 	SetWithExpire(key string, v interface{}, expire time.Duration) error

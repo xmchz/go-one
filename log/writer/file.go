@@ -2,8 +2,7 @@ package writer
 
 import (
 	rotateLogs "github.com/lestrrat-go/file-rotatelogs"
-	"github.com/xmchz/go-one/log"
-	"io"
+	"github.com/xmchz/go-one/log/core"
 	"os"
 	"path"
 	"time"
@@ -37,27 +36,28 @@ func WithMaxAge(maxAge time.Duration) Option {
 	}
 }
 
-func WithFormatter(formatter log.Formatter) Option {
+func WithFormatter(formatter core.Formatter) Option {
 	return func(fw *file) {
 		fw.Formatter = formatter
 	}
 }
 
 type file struct {
-	io.WriteCloser
-	log.Formatter
+	// io.WriteCloser
+	*rotateLogs.RotateLogs
+	core.Formatter
 	logName      string
 	relativePath string
 	rotateTime   time.Duration
 	maxAge       time.Duration
 }
 
-func (fw *file) Write(data *log.Data) {
-	_, _ = fw.WriteCloser.Write(fw.Format(data))
+func (fw *file) Write(data *core.Data) {
+	_, _ = fw.RotateLogs.Write(append(fw.Format(data), '\n'))
 }
 
 func (fw *file) Close() {
-	_ = fw.WriteCloser.Close()
+	_ = fw.RotateLogs.Close()
 }
 
 func (fw *file) init() error {
@@ -79,6 +79,6 @@ func (fw *file) init() error {
 	if err != nil {
 		return err
 	}
-	fw.WriteCloser = rotate
+	fw.RotateLogs = rotate
 	return nil
 }

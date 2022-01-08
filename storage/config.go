@@ -7,4 +7,6 @@ type Config interface {
 	DbInfo() string
 	MaxIdleConn() int
 	MaxOpenConn() int
+	MigrationUrl() string
+	MigrationVersion() uint
 }

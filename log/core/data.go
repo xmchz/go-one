@@ -1,4 +1,4 @@
-package log
+package core
 
 import (
 	"bytes"
@@ -12,15 +12,15 @@ type Data struct {
 	Filename string    `json:"filename"`
 	LineNo   int       `json:"line_no"`
 	Message  string    `json:"message,omitempty"`
-	Fields   Fields    `json:"fields,omitempty"`
+	Fields   fields    `json:"fields,omitempty"`
 }
 
-type Fields map[string]interface{}
+type fields map[string]interface{}
 
-func (fields Fields) String() string {
+func (fs fields) String() string {
 	var buf bytes.Buffer
-	for k, v := range fields {
+	for k, v := range fs {
 		buf.WriteString(fmt.Sprintf("%v=%v ", k, v))
 	}
-	return string(buf.Bytes())
+	return buf.String()
 }

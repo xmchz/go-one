@@ -1,23 +1,28 @@
 package writer
 
 import (
-	"fmt"
-	"github.com/xmchz/go-one/log"
+	// "fmt"
+	"github.com/xmchz/go-one/log/core"
 	"os"
 )
 
-type Console struct {
-	log.Formatter
+func NewConsole(f core.Formatter) *console{
+	return &console{f}
 }
 
-func (w *Console) Write(data *log.Data) {
+type console struct {
+	core.Formatter
+}
+
+func (w *console) Write(data *core.Data) {
 	colored := cm[data.Level].Add(string(w.Format(data)))
-	_, err := os.Stdout.Write([]byte(colored))
-	if err != nil {
-		fmt.Println(err)
-	}
+	_, _ = os.Stdout.Write(append([]byte(colored), '\n'))
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
 }
 
-func (w *Console) Close() {
+func (w *console) Close() {
+	// os.Stdout.Close()
 }
 
