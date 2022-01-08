@@ -48,7 +48,7 @@ func doMigrate(conf Config, db *sql.DB) {
 	if err != nil {
 		log.Fatal("migrate connect DB failed, err:%v", err)
 	}
-	defer driver.Close()
+	// defer driver.Close()
 	m, err := migrate.NewWithDatabaseInstance(
 		conf.MigrationUrl(),
 		conf.DbName(),
