@@ -67,13 +67,23 @@ func doMigrate(conf Config, db *sql.DB) {
 
 type Storage interface {
 	access.Storage
-	BeginWithTx(ctx context.Context) (context.Context, func(interface{}, error) error, error)
+	TxStorage
 	Create(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	Find(ctx context.Context, dest interface{}, query string, args ...interface{}) error
 	FindList(ctx context.Context, dests interface{}, query string, args ...interface{}) error
 	FindListIn(ctx context.Context, dests interface{}, query string, set interface{}) error
 	Update(ctx context.Context, query string, args ...interface{}) error
 	Delete(ctx context.Context, query string, args ...interface{}) error
+}
+
+type CleanTxFunc func(err error, recoveredP interface{}) error
+
+var noOpCleanTxFunc CleanTxFunc = func(error, interface{}) error {
+	return nil
+}
+
+type TxStorage interface {
+	BeginWithTx(ctx context.Context) (context.Context, CleanTxFunc, error)
 }
 
 type storage struct {
@@ -84,33 +94,30 @@ func (s *storage) AccessAdapter(tblName string) (access.Adapter, error) {
 	return sqlxAdapter.NewAdapter(s.DB, tblName)
 }
 
-func (s *storage) BeginWithTx(ctx context.Context) (context.Context, func(recoveredPanic interface{}, err error) error, error) {
+func (s *storage) BeginWithTx(ctx context.Context) (context.Context, CleanTxFunc, error) {
+	if tx := s.txFromCtx(ctx); tx != nil {
+		return ctx, noOpCleanTxFunc, nil
+	}
 	tx, err := s.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, nil, err
 	}
-	cleanFunc := func(recoveredPanic interface{} , err error) error {
-		if recoveredPanic != nil {
-			log.Debug("rollback by panic: %v", recoveredPanic)
-			if err := tx.Rollback(); err != nil {
-				log.Error("rollback err: %s", err)
-				return err
+	cleanFunc := func(err error, recoveredPanic interface{}) error {
+		if recoveredPanic != nil || err != nil {
+			if errR := tx.Rollback(); errR != nil {
+				log.Error("rollback by panic: %v, err: %s, rollback failed: %s", recoveredPanic, err, errR)
+				return errR
 			}
-			log.Debug("rollback success")
+			log.Info("rollback by panic: %v, err: %s, rollback success", recoveredPanic, err)
 			return nil
 		}
-		if err != nil {
-			log.Debug("rollback by err: %s", err)
-			if err := tx.Rollback(); err != nil {
-				log.Error("rollback err: %s", err)
-				return err
+		if errC := tx.Commit(); errC != nil {
+			if errR := tx.Rollback(); errR != nil {
+				log.Error("commit err: %s, rollback failed: %s", errC, errR)
+				return errR
 			}
-			log.Debug("rollback success")
+			log.Info("commit err: %s, rollback success", errC)
 			return nil
-		}
-		if err := tx.Commit(); err != nil {
-			log.Error("commit err: %s", err)
-			return err
 		}
 		log.Debug("commit success")
 		return nil
@@ -133,7 +140,7 @@ func (s *storage) Delete(ctx context.Context, query string, args ...interface{})
 }
 
 func (s *storage) Find(ctx context.Context, dest interface{}, query string, args ...interface{}) (err error) {
-	if tx := s.tx(ctx); tx != nil {
+	if tx := s.txFromCtx(ctx); tx != nil {
 		err = tx.GetContext(ctx, dest, query, args...)
 		return
 	}
@@ -142,7 +149,7 @@ func (s *storage) Find(ctx context.Context, dest interface{}, query string, args
 }
 
 func (s *storage) FindList(ctx context.Context, dests interface{}, query string, args ...interface{}) (err error) {
-	if tx := s.tx(ctx); tx != nil {
+	if tx := s.txFromCtx(ctx); tx != nil {
 		err = tx.SelectContext(ctx, dests, query, args...)
 		return
 	}
@@ -156,7 +163,7 @@ func (s *storage) FindListIn(ctx context.Context, dests interface{}, query strin
 	if err != nil {
 		return
 	}
-	if tx := s.tx(ctx); tx != nil {
+	if tx := s.txFromCtx(ctx); tx != nil {
 		err = tx.SelectContext(ctx, dests, query, args...)
 		return
 	}
@@ -165,13 +172,13 @@ func (s *storage) FindListIn(ctx context.Context, dests interface{}, query strin
 }
 
 func (s *storage) exec(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-	if tx := s.tx(ctx); tx != nil {
+	if tx := s.txFromCtx(ctx); tx != nil {
 		return tx.ExecContext(ctx, query, args...)
 	}
 	return s.DB.ExecContext(ctx, query, args...)
 }
 
-func (s *storage) tx(ctx context.Context) *sqlx.Tx {
+func (s *storage) txFromCtx(ctx context.Context) *sqlx.Tx {
 	tx, ok := ctx.Value(ctxKeyForTx).(*sqlx.Tx)
 	if !ok {
 		return nil

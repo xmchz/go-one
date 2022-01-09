@@ -83,7 +83,7 @@ func TestStorage_Tx(t *testing.T) {
 	ctx, cleanTx, err := s.BeginWithTx(context.Background())
 	require.Nil(t, err)
 	defer func() {
-		cleanErr := cleanTx(recover(), err)
+		cleanErr := cleanTx(err, recover())
 		require.Nil(t, cleanErr)
 	}()
 	if _, err = s.Create(ctx, sqlInsert, ""); err != nil {
@@ -99,7 +99,7 @@ func TestStorage_Tx2(t *testing.T) {
 	ctx, cleanTx, err := s.BeginWithTx(context.Background())
 	require.Nil(t, err)
 	defer func() {
-		cleanErr := cleanTx(recover(), err)
+		cleanErr := cleanTx(err, recover())
 		require.Nil(t, cleanErr)
 	}()
 	if _, err = s.Create(ctx, sqlInsert, ""); err != nil {
